@@ -26,8 +26,3 @@ seuratify <- function(counts, prj_name, metadata){
 
 
 
-Seurat
-dplyr
-ggplot2 
-data.table 
-reshape2
