@@ -2,12 +2,9 @@
 % Please edit documentation in R/scRNA.R
 \name{seuratify}
 \alias{seuratify}
-\title{This function loads a file as a matrix. It assumes that the first column
-contains the rownames and the subsequent columns are the sample identifiers.
-Any rows with duplicated row names will be dropped with the first one being
-kepted.}
+\title{Seuratify your Single Cell Data}
 \usage{
-seuratify(counts, prj_name, metadata)
+seuratify(counts, prj_name = "")
 }
 \arguments{
 \item{counts}{a \emph{m} x \emph{n} matrix of raw count data where \emph{m} = no. genes, and \emph{n} = no. cells}
@@ -20,8 +17,6 @@ seuratify(counts, prj_name, metadata)
 a Seurat object of your count matrix with metadata
 }
 \description{
-This function loads a file as a matrix. It assumes that the first column
-contains the rownames and the subsequent columns are the sample identifiers.
-Any rows with duplicated row names will be dropped with the first one being
-kepted.
+This function takes in raw counts data and
+associated metadata and creates a SeuratObject
 }

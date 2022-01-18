@@ -31,12 +31,11 @@ subsample <- function(counts, metadata, p=0.5){
 #' @param prj_name project name string 
 #' @return a Seurat object of your count matrix with metadata 
 #' @export
-seuratify <- function(counts, metadata, prj_name = ""){
+seuratify <- function(counts, prj_name = ""){
   start_time <- Sys.time()
   
   so <- Seurat::CreateSeuratObject(counts, project = prj_name)
   so@meta.data$cellid <- row.names(so@meta.data)
-  # so@meta.data <- data.table::merge.data.table(so@meta.data, metadata, by = "cellid", all.x = T, sort = F)
   
   end_time <- Sys.time()
   run_time <- end_time - start_time
@@ -82,12 +81,13 @@ std_preprocess <- function(so){
 #' @export
 #' 
 embed <- function(so,
-                  approx_pca.flag = T 
+                  approx_pca.flag = T,
                   tsne.flag = F,
                   umap.flag = F,
                   n_pcs = 30,
                   resolution = 0.4,
-                  plot = T){
+                  plot = T, 
+                  plot.out = ""){
   out <- list()
   
   # run pca
@@ -110,8 +110,6 @@ embed <- function(so,
   print(run_time)
   
   out[["pca"]] <- so[["pca"]]@cell.embeddings
-  
-  print(run_time)
   
   # run tsne
   if (tsne.flag){
@@ -142,21 +140,30 @@ embed <- function(so,
   # clustering
   print("Running Clustering...")
   start_time <- Sys.time()
-  so <- FindNeighbors(so, reduction = "pca",dims = 1:n_pcs)
-  so <- FindClusters(so, resolution = resolution)
+  so <- Seurat::FindNeighbors(so, reduction = "pca",dims = 1:n_pcs)
+  so <- Seurat::FindClusters(so, resolution = resolution)
   end_time <- Sys.time()
   run_time <- end_time - start_time
   print(run_time)
   
+  out[["cluster"]] <- so@meta.data$seurat_clusters
+  
   if (plot) {
     if (tsne.flag) {
-      Seurat::DimPlot(so, reduction = "tsne", group.by = "orig.ident") 
+      p <- Seurat::DimPlot(so, reduction = "tsne", group.by = "RNA_snn_res.0.4")
+      png(paste0(plot.out, "tsne.png"))
+      print(p)
+      dev.off()
     }
     if (umap.flag) {
-      Seurat::DimPlot(so, reduction = "umap", group.by = "cluster") 
+      p <- Seurat::DimPlot(so, reduction = "umap", group.by = "RNA_snn_res.0.4")
+      png(paste0(plot.out, "umap.png"), width = 6, height = 5, res = 200, units = "in")
+      print(p)
+      dev.off()
     }
   }
+  
+  out[["so"]] <- so
+  
+  return(out)
 }
-
-search_for_cluster_resolution()
-
