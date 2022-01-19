@@ -7,6 +7,7 @@
 embed(
   so,
   approx_pca.flag = T,
+  pca.assay = "SCT",
   tsne.flag = F,
   umap.flag = F,
   n_pcs = 30,

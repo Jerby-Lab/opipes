@@ -1,3 +1,5 @@
+'%!in%' <- function(x,y)!('%in%'(x,y))
+
 #' Randomly subsample single cell data set
 #' 
 #' Randomly subsample a proportion of data, 
@@ -82,6 +84,7 @@ std_preprocess <- function(so){
 #' 
 embed <- function(so,
                   approx_pca.flag = T,
+                  pca.assay = "SCT",
                   tsne.flag = F,
                   umap.flag = F,
                   n_pcs = 30,
@@ -93,7 +96,7 @@ embed <- function(so,
   # run pca
   start_time <- Sys.time()
   print("Running PCA....")
-  so <- Seurat::RunPCA(so, npcs= n_pcs, approx = approx_pca.flag)
+  so <- Seurat::RunPCA(so, npcs= n_pcs, assay = pca.assay, approx = approx_pca.flag)
   
   # calculate variance explained
   mat <- Seurat::GetAssayData(so, assay = "RNA", slot = "scale.data")
