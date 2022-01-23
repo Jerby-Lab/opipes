@@ -4,12 +4,14 @@
 \alias{cluster}
 \title{Wrapper around sNN clustering in Seurat}
 \usage{
-cluster(so, resolution = 0.4)
+cluster(so, resolution = 0.4, n_pcs = 30)
 }
 \arguments{
 \item{so}{a SeuratObject of your data}
 
 \item{resolution}{clustering resolution, default = 0.4}
+
+\item{n_pcs}{how many pcs to cluster on}
 }
 \value{
 a list of all parameters calculated
