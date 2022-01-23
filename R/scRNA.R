@@ -123,6 +123,7 @@ run_pca <- function(so,
 #' @param umap.flag boolean, run umap?
 #' @param n_pcs number of PCs to run umap and tsne on 
 #' @return a list of all parameters calculated 
+#' @export
 
 embed <- function(so, 
                   tsne.flag = F,
@@ -170,7 +171,7 @@ embed <- function(so,
 #' @param so a SeuratObject of your data
 #' @param resolution clustering resolution, default = 0.4
 #' @return a list of all parameters calculated 
-
+#' @export
 cluster <- function(so, 
                     resolution = 0.4){
   out <- list()
