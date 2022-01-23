@@ -2,39 +2,22 @@
 % Please edit documentation in R/scRNA.R
 \name{embed}
 \alias{embed}
-\title{Embedding methods: PCA, tSNE, UMAP}
+\title{Wrapper around UMAP and/or TSNE}
 \usage{
-embed(
-  so,
-  approx_pca.flag = T,
-  pca.assay = "SCT",
-  tsne.flag = F,
-  umap.flag = F,
-  n_pcs = 30,
-  resolution = 0.4,
-  plot = T,
-  plot.out = ""
-)
+embed(so, tsne.flag = F, umap.flag = F, n_pcs = 30)
 }
 \arguments{
 \item{so}{a SeuratObject of your data}
-
-\item{approx_pca.flag}{approximate PCA calculation?}
 
 \item{tsne.flag}{boolean, run tSNE?}
 
 \item{umap.flag}{boolean, run umap?}
 
 \item{n_pcs}{number of PCs to run umap and tsne on}
-
-\item{resolution}{clustering resolution, default = 0.4}
-
-\item{plot}{plot initial clustering?}
 }
 \value{
 a list of all parameters calculated
 }
 \description{
-functionality for returning PCA, tSNE,
-and UMAP projections
+functionality for returning UMAP an TSNE results
 }

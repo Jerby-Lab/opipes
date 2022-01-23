@@ -56,7 +56,7 @@ seuratify <- function(counts, prj_name = ""){
 #' 
 std_preprocess <- function(so){
   start_time <- Sys.time()
-
+  
   so <- Seurat::NormalizeData(so)
   so <- Seurat::FindVariableFeatures(so, selection.method = "vst", nfeatures = 2000)
   so <- Seurat::ScaleData(so)
@@ -67,52 +67,68 @@ std_preprocess <- function(so){
   return(so)
 }
 
-#' Embedding methods: PCA, tSNE, UMAP
+#' Wrapper around PCA 
 #' 
-#' functionality for returning PCA, tSNE, 
-#' and UMAP projections 
+#' functionality for returning PCA results in Seurat Object
 #'
 #' @param so a SeuratObject of your data 
+#' @param pca.assay = which assay to use, SCT or RNA
 #' @param approx_pca.flag approximate PCA calculation? 
-#' @param tsne.flag boolean, run tSNE? 
-#' @param umap.flag boolean, run umap?
-#' @param n_pcs number of PCs to run umap and tsne on 
-#' @param resolution clustering resolution, default = 0.4
-#' @param plot plot initial clustering?
-#' @return a list of all parameters calculated 
 #' @export
 #' 
-embed <- function(so,
-                  approx_pca.flag = T,
-                  pca.assay = "SCT",
-                  tsne.flag = F,
-                  umap.flag = F,
-                  n_pcs = 30,
-                  resolution = 0.4,
-                  plot = T, 
-                  plot.out = ""){
+run_pca <- function(so,
+                    approx_pca.flag = F,
+                    pca.assay = "RNA",
+                    n_pcs = 30) {
+  
   out <- list()
   
   # run pca
   start_time <- Sys.time()
   print("Running PCA....")
-  so <- Seurat::RunPCA(so, npcs= n_pcs, assay = pca.assay, approx = approx_pca.flag)
+  so <- Seurat::RunPCA(so, 
+                       npcs= length(row.names(so)), 
+                       assay = pca.assay, 
+                       approx = approx_pca.flag) # always run on all PCs
   
   # calculate variance explained
-  mat <- Seurat::GetAssayData(so, assay = "RNA", slot = "scale.data")
+  mat <- Seurat::GetAssayData(so, assay = pca.assay, slot = "scale.data")
   total_variance <- sum(matrixStats::rowVars(mat))
   eigValues = (so[["pca"]]@stdev)^2  ## EigenValues
   varExplained = eigValues / total_variance
   
   print(paste0("PC1 Variance Explained: ", round(varExplained[1]*100, 2), "%"))
   print(paste0("PC2 Vairance Explained: ", round(varExplained[2]*100, 2), "%"))
-  print(paste0("Variance Explained in ", n_pcs, " PCs : ", round(sum(varExplained*100), 2), "%"))
+  print(paste0("Variance Explained in ", n_pcs, " PCs : ", round(sum(varExplained[1:n_pcs]*100), 2), "%"))
   
   end_time <- Sys.time()
   run_time <- end_time - start_time
   print(run_time)
   
+  
   out[["pca"]] <- so[["pca"]]@cell.embeddings
+  out[["so"]] <- so
+  
+  return(out)
+  
+}
+
+
+#' Wrapper around UMAP and/or TSNE
+#' 
+#' functionality for returning UMAP an TSNE results 
+#'
+#' @param so a SeuratObject of your data
+#' @param tsne.flag boolean, run tSNE? 
+#' @param umap.flag boolean, run umap?
+#' @param n_pcs number of PCs to run umap and tsne on 
+#' @return a list of all parameters calculated 
+
+embed <- function(so, 
+                  tsne.flag = F,
+                  umap.flag = F,
+                  n_pcs = 30) {
+  out <- list()
   
   # run tsne
   if (tsne.flag){
@@ -120,7 +136,7 @@ embed <- function(so,
     
     print("Running TSNE...")
     so <- Seurat::RunTSNE(object = so, reduction.use = "pca",dims = 1:n_pcs, do.fast = TRUE)
-     out[["tsne"]] <- so[["tsne"]]@cell.embeddings
+    out[["tsne"]] <- so[["tsne"]]@cell.embeddings
     
     end_time <- Sys.time()
     run_time <- end_time - start_time
@@ -140,33 +156,57 @@ embed <- function(so,
     print(run_time)
   }
   
+  
+  out[["so"]] <- so
+  
+  return(out)
+}
+
+
+#' Wrapper around sNN clustering in Seurat
+#' 
+#' functionality for returning clusters 
+#'
+#' @param so a SeuratObject of your data
+#' @param resolution clustering resolution, default = 0.4
+#' @return a list of all parameters calculated 
+
+cluster <- function(so, 
+                    resolution = 0.4){
+  out <- list()
+  
   # clustering
   print("Running Clustering...")
   start_time <- Sys.time()
-  so <- Seurat::FindNeighbors(so, reduction = "pca",dims = 1:n_pcs)
+  so <- Seurat::FindNeighbors(so, reduction = "pca",dims = 1:n_pcs_umap)
   so <- Seurat::FindClusters(so, resolution = resolution)
   end_time <- Sys.time()
   run_time <- end_time - start_time
   print(run_time)
   
   out[["cluster"]] <- so@meta.data$seurat_clusters
-  
-  if (plot) {
-    if (tsne.flag) {
-      p <- Seurat::DimPlot(so, reduction = "tsne", group.by = "RNA_snn_res.0.4")
-      png(paste0(plot.out, "tsne.png"))
-      print(p)
-      dev.off()
-    }
-    if (umap.flag) {
-      p <- Seurat::DimPlot(so, reduction = "umap", group.by = "RNA_snn_res.0.4")
-      png(paste0(plot.out, "umap.png"), width = 6, height = 5, res = 200, units = "in")
-      print(p)
-      dev.off()
-    }
-  }
-  
   out[["so"]] <- so
   
   return(out)
 }
+
+
+
+
+
+
+
+
+
+
+
+
+                  
+
+                  
+                  
+                  
+        
+
+
+
