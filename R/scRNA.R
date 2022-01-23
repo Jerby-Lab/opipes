@@ -172,6 +172,7 @@ embed <- function(so,
 #' @param resolution clustering resolution, default = 0.4
 #' @return a list of all parameters calculated 
 #' @export
+#' 
 cluster <- function(so, 
                     resolution = 0.4){
   out <- list()
