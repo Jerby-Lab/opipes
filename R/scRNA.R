@@ -170,17 +170,19 @@ embed <- function(so,
 #'
 #' @param so a SeuratObject of your data
 #' @param resolution clustering resolution, default = 0.4
+#' @param n_pcs how many pcs to cluster on
 #' @return a list of all parameters calculated 
 #' @export
 #' 
 cluster <- function(so, 
-                    resolution = 0.4){
+                    resolution = 0.4,
+                    n_pcs = 30){
   out <- list()
   
   # clustering
   print("Running Clustering...")
   start_time <- Sys.time()
-  so <- Seurat::FindNeighbors(so, reduction = "pca",dims = 1:n_pcs_umap)
+  so <- Seurat::FindNeighbors(so, reduction = "pca",dims = 1:n_pcs)
   so <- Seurat::FindClusters(so, resolution = resolution)
   end_time <- Sys.time()
   run_time <- end_time - start_time
