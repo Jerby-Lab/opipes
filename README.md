@@ -5,7 +5,8 @@
 
 ## Installation
 
-Installation of RStudio is highly recommended
+Installation of RStudio is highly recommended, but not required
+
 Install R (>= 4.0.3) 
 
 ```
