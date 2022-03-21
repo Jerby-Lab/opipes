@@ -4,7 +4,7 @@
 \alias{subsample}
 \title{Randomly subsample single cell data set}
 \usage{
-subsample(counts, metadata, p = 0.5, replace = T)
+subsample(counts, metadata, p = 0.5, replace = F)
 }
 \arguments{
 \item{counts}{a \emph{m} x \emph{n} matrix of raw count data where \emph{m} = no. genes, and \emph{n} = no. cells}
@@ -12,6 +12,8 @@ subsample(counts, metadata, p = 0.5, replace = T)
 \item{metadata}{matrix \emph{n} x \emph{j} of metadata where \emph{n} = no. cells, and \emph{j} = no. features}
 
 \item{p}{proportion of data to subsample (p = \link{0, 1})}
+
+\item{replace}{boolean to sample with (T) or without (F) replacement}
 }
 \value{
 a list with objects named "c" and "m" corresponding to your subsampled counts and metadata

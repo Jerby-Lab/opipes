@@ -26,10 +26,10 @@ seuratify <- function(counts, prj_name = ""){
 #' @return a preprocessed SeuratObject
 #' @export
 #'
-std_preprocess <- function(so){
+std_preprocess <- function(so, nfeatures =100){
 
   so <- Seurat::NormalizeData(so)
-  so <- Seurat::FindVariableFeatures(so, selection.method = "vst", nfeatures = 2000)
+  so <- Seurat::FindVariableFeatures(so, selection.method = "vst", nfeatures = 100)
   so <- Seurat::ScaleData(so)
 
   return(so)
@@ -107,7 +107,7 @@ umap_tsne <- function(so,
     cat("\n\tRunning TSNE...\n")
     so <- Seurat::RunTSNE(object = so,
                           reduction.use = reduction,
-                          dims = 1:dims,
+                          dims = 1:n_dims,
                           do.fast = TRUE,
                           verbose=verbose)
   }
@@ -116,7 +116,7 @@ umap_tsne <- function(so,
   if(umap.flag){
     cat("\n\tRunning UMAP...\n")
     so <- Seurat::RunUMAP(object = so,
-                          dims = 1:dims,
+                          dims = 1:n_dims,
                           reduction=reduction,
                           verbose = verbose)
   }
@@ -144,7 +144,7 @@ cluster <- function(so,
   so <- Seurat::FindNeighbors(so, reduction = reduction ,dims = 1:n_dims)
   so <- Seurat::FindClusters(so, resolution = resolution)
 
-  return(out)
+  return(so)
 }
 
 
