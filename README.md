@@ -1,6 +1,18 @@
 # opipes: "omics pipelines"
-### _a set of computational tools for multi-omics analysis_
-------------------------------
+
+## Description
+`opipes` is an actively maintained R package aiming to make code for multi-omics analysis easier for all users! 
+
+## Installation
+
+Installation of RStudio is highly recommended
+Install R (>= 4.0.3) 
+
+```
+install.packages("devtools")
+library(devtools)
+install_github("christineyyeh/opipes")
+```
 
 ## Tutorials 
 [Markers-based Cell Type assignments for scRNA data](http://htmlpreview.github.io/https://github.com/christineyyeh/opipes/blob/main/vignettes/cell_type_assignments.html)
