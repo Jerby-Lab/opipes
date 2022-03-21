@@ -1,5 +1,8 @@
-# opipes: "omics pipelines"
-This is a repository for commonly used functions in omics analysis
------
+# opipes: "omics pipelines", a set of tools for multi-omics analysis 
 
-Currently, we have one tutorial available:
+## Tutorials 
+Markers-based Cell Type assignments for scRNA data: 
+
+## Questions? 
+Contact: Christine Yeh (cyyeh@stanford.edu)
+
