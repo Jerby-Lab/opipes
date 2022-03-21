@@ -1,0 +1,107 @@
+---
+title: "Cell Type Assignments"
+author: "Christine Yiwen Yeh"
+date: "3/20/2022"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Bulk RNA-Sequencing REMI Tutorial}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load `opipes`, the Jerby Lab's omics package 
+
+```{r}
+library(opipes)
+```
+
+## Load data 
+
+Here we load one sample of single cell MERFISH data on an ovarian cancer tumor 
+
+```{r}
+out <- readRDS("~/Downloads/20220320_sample3.rds")
+tpm <- do.call("cbind", out[["counts"]])
+meta <- do.call("rbind", out[["meta"]])
+row.names(meta) <- meta$cellid
+```
+
+## Subsample the data 
+
+If your dataset is very large and you need to subsample data, then you can use this functionality below. Here we set `p=1` because we want to use all the data. 
+
+```{r}
+sub <- subsample(tpm, meta, p =1)
+tpm <- sub[["c"]]
+meta <- sub[["m"]]
+```
+
+## Seurat: Dimension Reduction and Clustering 
+
+This package includes some standard `Seurat` functions for getting started on the bread and butter steps in processing single cell RNA-seq data. Note that the `UMAP` step usually takes a while. 
+
+```{r echo=TRUE, message=FALSE, warning=FALSE}
+so <- seuratify(tpm, prj_name = "tutorial_data_set") # create Seurat Object
+so <- std_preprocess(so) # normalize and scale
+so <- run_pca(so, n_pcs=10) # run PCA
+so <- umap_tsne(so, umap.flag = T, n_dims = 10) # run UMAP
+so <- cluster(so, n_dims = 10, reduction = "pca") # cluster (sNN)
+```
+
+## Cell-type Assignments 
+
+We have our own in-house cell-type assignment algorithm. This is how to use it: 
+
+```{r}
+# create r object 
+r <- c()
+r$tpm <- tpm 
+r$genes <- row.names(tpm)
+r$cells <- colnames(tpm)
+r$clusters <- paste0("C", so$RNA_snn_res.0.4)
+
+# read in your preferred cell type signatures
+cell.sig <- readRDS("~/Downloads/cell.type.sig.rds")
+cell.sig <- cell.sig$HGSC[-c(3,4,10)] # removing CD8.T, CD4.T, and cell cycle genes for now
+
+# execute to cell-type assignment code
+r <- scRNA_markers_assign(r = r, 
+                     cell.clusters = r$clusters,
+                     cell.sig = cell.sig,
+                     non.immune.cell.types = c('Endothelial','CAF','Malignant'),
+                     immune.markers = c("CD3E","PTPRC","CD8A" , "CD4"))
+```
+
+## Now let's plot our results
+
+First we make a data-frame with all the data that you plan on plotting, including the `UMAP` dimensions, cell-types, clusters, etc. 
+
+```{r}
+library(ggplot2)
+plot <- data.frame(so@reductions$umap@cell.embeddings, # UMAP
+                   cluster = so$RNA_snn_res.0.4, # clusters
+                   cell.types = r$cell.types) # cell types
+```
+
+And here are the fruits of your labor:
+
+```{r fig.height=4, fig.width=6}
+# plot UMAP with clusters
+ggplot(plot, aes(x = UMAP_1, y = UMAP_2, col = cluster)) + 
+  geom_point(size = 0.2) +
+  theme_bw() + 
+  guides(colour = guide_legend("Cluster", override.aes = list(size=3, shape = 15))) + 
+  theme(plot.title = element_text(hjust = 0.5, size = 18, face = "bold"))  
+```
+```{r fig.height=4, fig.width=6}
+ggplot(plot, aes(x = UMAP_1, y = UMAP_2, col = cell.types)) + 
+  geom_point(size = 0.2) +
+  theme_bw() + 
+  guides(colour = guide_legend("Cluster", override.aes = list(size=3, shape = 15))) + 
+  theme(plot.title = element_text(hjust = 0.5, size = 18, face = "bold"))  
+```
+

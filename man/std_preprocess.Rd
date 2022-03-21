@@ -4,7 +4,7 @@
 \alias{std_preprocess}
 \title{Standard single cell RNA preprocessing}
 \usage{
-std_preprocess(so)
+std_preprocess(so, nfeatures = 100)
 }
 \arguments{
 \item{so}{a SeuratObject of your data}
