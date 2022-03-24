@@ -16,9 +16,7 @@ install_github("christineyyeh/opipes")
 ```
 
 ## Tutorials 
-[Markers-based Cell Type assignments for scRNA data](https://github.com/christineyyeh/opipes/blob/gh-pages/vignettes/cell_type_assignments.html)
-
-_N.B. this repo is private right now. If you want to view this html, I suggest cloning this repo and viewing the html in a browser_
+[Markers-based Cell Type assignments for scRNA data](https://htmlpreview.github.io/?https://github.com/christineyyeh/opipes/blob/gh-pages/vignettes/cell_type_assignments.html)
 
 ## Questions? 
 Contact: Christine Yeh (cyyeh@stanford.edu)
