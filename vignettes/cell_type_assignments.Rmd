@@ -104,4 +104,8 @@ ggplot(plot, aes(x = UMAP_1, y = UMAP_2, col = cell.types)) +
   guides(colour = guide_legend("Cluster", override.aes = list(size=3, shape = 15))) + 
   theme(plot.title = element_text(hjust = 0.5, size = 18, face = "bold"))  
 ```
+```{r}
+saveRDS(so, file = "../../hgosc/intermediates/20220323_precomputed.rds")
+saveRDS(plot, file = "../../hgosc/intermediates/20220323_precomputed_plot.rds")
+```
 
