@@ -52,8 +52,6 @@ run_pca <- function(so,
                     verbose = F) {
 
   # run pca
-  start_time <- Sys.time()
-  print("Running PCA....")
   so <- Seurat::RunPCA(so,
                        npcs= n_pcs,
                        assay = pca.assay,
@@ -72,13 +70,12 @@ run_pca <- function(so,
 #' @return a list of all parameters calculated
 #' @export
 
-var_explained_seurat <- function(so, slot = "scale.data"){
+var_explained_seurat <- function(so, slot = "scale.data", pca.assay = "pca"){
   # calculate variance explained
   mat <- Seurat::GetAssayData(so, assay = pca.assay, slot = slot)
   total_variance <- sum(matrixStats::rowVars(mat))
   eigValues = (so[["pca"]]@stdev)^2  ## eigenValues
   varExplained = eigValues / total_variance
-
   return(varExplained)
 }
 

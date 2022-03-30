@@ -4,7 +4,7 @@
 \alias{var_explained_seurat}
 \title{Variance Explained}
 \usage{
-var_explained_seurat(so, slot = "scale.data")
+var_explained_seurat(so, slot = "scale.data", pca.assay = "pca")
 }
 \arguments{
 \item{so}{a SeuratObject of your data (with pca run)}

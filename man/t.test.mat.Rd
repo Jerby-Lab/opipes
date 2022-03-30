@@ -7,7 +7,7 @@
 \method{t}{test.mat}(m, b, two.sided = F, rankf = F, fold.changeF = F)
 }
 \arguments{
-\item{m}{markers matrix (subsampled)}
+\item{m}{markers matrix (subsampled, in some cases)}
 
 \item{b}{boolean for the right cluster}
 

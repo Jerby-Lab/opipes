@@ -261,7 +261,7 @@ discretize.prvt<-function(v,
 #'
 #' computes _t_-tests for a matrix
 #'
-#' @param m markers matrix (subsampled)
+#' @param m markers matrix (subsampled, in some cases)
 #' @param b boolean for the right cluster
 #' @param two.sided boolean to determine whether you want to run a two-sided t-test
 #' @param rankf (default = F)
@@ -269,8 +269,6 @@ discretize.prvt<-function(v,
 #' @return p-value table
 #'
 t.test.mat<-function(m,b,two.sided=F,rankf = F,fold.changeF = F){
-  # m is the markers matrix (subsampled)
-  # b is the boolean for the cluster!
   if(length(b)!=ncol(m)){
     print("Error. Inconsistent no. of samples.")
     return()
