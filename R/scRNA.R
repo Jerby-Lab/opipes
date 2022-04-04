@@ -87,9 +87,10 @@ run_pca <- function(so,
   start_time <- Sys.time()
   print("Running PCA....")
   so <- Seurat::RunPCA(so,
-                       npcs= length(row.names(so)),
+                       npcs= length(row.names(so)), # always run on all PCs
                        assay = pca.assay,
-                       approx = approx_pca.flag) # always run on all PCs
+                       approx = approx_pca.flag,
+                       ) 
 
   # calculate variance explained
   mat <- Seurat::GetAssayData(so, assay = pca.assay, slot = "scale.data")
@@ -104,7 +105,6 @@ run_pca <- function(so,
   end_time <- Sys.time()
   run_time <- end_time - start_time
   print(run_time)
-
 
   out[["pca"]] <- so[["pca"]]@cell.embeddings
   out[["so"]] <- so
