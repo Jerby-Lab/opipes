@@ -1,0 +1,208 @@
+---
+title: "Working with Image Data"
+author: "Christine Yiwen Yeh"
+date: "4/8/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Set-up: Loading/Installing Packages
+
+The one special package we are using is `EBImage`, to load and process image data within R! 
+This package is available via download from Bioconductor with the code commented out below.
+
+```{r cars}
+# if (!require("BiocManager", quietly = TRUE))
+#     install.packages("BiocManager")
+# BiocManager::install(version = "3.14")
+# BiocManager::install("EBImage")
+library(EBImage)
+library(opipes) # package developed by yours truly for general and common lab fx
+library(ggplot2) # plotting software 
+library(tibble) 
+library(pbapply)
+```
+
+## Reading in the composite image for TMA-13, FOV-1 
+
+For the purposes of this tutorial, we're only loading one sample
+```{r}
+PATH <- "/Volumes/ljerby/HGSC_Profiling/Data/SMI/5 Raw data/SMI-0028_TMA_13/CellComposite/CellComposite_F001.jpg"
+comp <- readImage(PATH)
+display(comp, method = "raster")
+```
+
+_What's in an "Image" object in R?_
+```{r}
+comp
+```
+
+## Reading in IF layers for processing 
+
+```{r}
+PATH <- "/Volumes/ljerby/HGSC_Profiling/Data/SMI/5 Raw data/SMI-0028_TMA_13/RawMorphologyImages/20220222_094630_S2_C902_P99_N99_F001_Z005.TIF"
+img <- readImage(PATH)
+display(img, all = T)
+```
+
+## Exploring Segmentation
+
+Reading in the whole-cell segmentation map here: 
+```{r}
+# Reading and cleaning matrix names 
+cellseg <- read.csv("/Volumes/ljerby/HGSC_Profiling/Results/Segmentation/SMI/Seg/SMI_T13_F001_whole-cell.csv")
+colnames(cellseg) <- unlist(lapply(colnames(cellseg), function(x) {strsplit(x , split = "X0.")[[1]][2]}))
+colnames(cellseg)[1] <- "0"
+cellseg_raw <- cellseg
+cellseg_raw[1000:1020, 1000:1009]
+```
+
+Plotting the cell segmentation map
+```{r}
+# Plot the cell segmentation map
+cellseg[cellseg == 1001] <- 0.9 # if a pixel is part of the cell, set the image intensity to 0.9
+display(1- Image(t(as.matrix(cellseg))),  method = "raster")
+```
+
+Reading and plotting the nuclear-segmentation only map: 
+```{r}
+# Reading and cleaning matrix names 
+nuclearseg <- read.csv("/Volumes/ljerby/HGSC_Profiling/Results/Segmentation/SMI/Seg/SMI_T13_F001_nuclear.csv")
+colnames(nuclearseg) <- unlist(lapply(colnames(nuclearseg), function(x) {strsplit(x , split = "X0.")[[1]][2]}))
+colnames(nuclearseg)[1] <- "0"
+nuclearseg_raw <- nuclearseg
+
+# Plot the nuclear cell segmentation map
+nuclearseg[nuclearseg != 0] <- 0.9
+display(1- Image(t(as.matrix(nuclearseg))),  method = "raster")
+```
+
+## Match cell segmentation with IF intensities 
+
+From the documentation we obtained from `Nanostring`, we know that each of the 
+frames in the raw images corresponds to a particular immuno-fluorescent stain.
+`DAPI` and `Membrane (CD298/B2M)` was used to do the cell-segmentation. 
+`PanCK`, `CD45` and `CD3` immuno-flurescent intensity would be useful for 
+cross-checking with computationally derived cell-type assignments downstream, 
+so we will extract that now! 
+
+```{r}
+frameID <- data.frame(stain = c("Membrane", "PanCK", "CD45", "CD3", "DAPI"),
+           frame_id = c(1:5))
+tibble(frameID)
+```
+
+In the code block below, we loop over the 3 frames that contain 
+`PanCK`, `CD45` and `CD3` intensity, and every cell, to extract the IF intensity 
+of the cytoplasm. It is very slow (hours for one FOV), so we will not run it. 
+Instead, I have run this in parallel on the cluster (topic for another time). 
+
+```{r eval=FALSE, include=TRUE}
+if_list <- lapply(2:4, function(fid){
+  print(fid)
+  intensities <- data.frame(t(pbsapply(c(1:max(cellseg_raw)), simplify = T, function(cid){
+    if (sum(t(cellseg_raw) == cid & t(nuclearseg) == 0) == 0) { # this is the case where the cell segmentation is pretty much just the nucleus...
+      return(c(NA, NA))
+    } else { 
+      mean <- mean(img@.Data[,,fid][t(cellseg_raw) == cid & t(nuclearseg) == 0])
+      max <- max(img@.Data[,,fid][t(cellseg_raw) == cid & t(nuclearseg) == 0])
+      return(c(max, mean)) 
+    }
+  })))
+  colnames(intensities) <- paste0(frameID[fid,]$stain, c("_max", "_mean")) 
+  return(intensities)
+})
+if_frame <- do.call("cbind", if_list)
+row.names(if_frame) <- c(1:max(cellseg_raw))
+saveRDS(if_frame, file = "/Volumes/ljerby/HGSC_Profiling/Intermediate/20220410_TMA13_FOV1_intensities.rds")
+```
+
+
+## Computational cell-type assignments
+
+Now reading in the RNA quantifications: 
+
+```{r}
+tma13 <- readRDS("/Volumes/ljerby/HGSC_Profiling/Data/R_data/SMI_HGSC_TMA13_mesmer.rds")
+r <- tma13$SMI_T13_F001
+remove(tma13)
+names(r)
+```
+
+First, we process the data by filtering out cells with too few overall counts
+
+```{r}
+tpm <- r$tpm[,unlist(apply(r$cd, 2, sum)) > 50]
+coor <- r$coor[unlist(apply(r$cd, 2, sum)) > 50,]
+```
+
+Now we use the wrappers in `opipes` to cluster the data
+
+```{r}
+so <- seuratify(tpm, prj = "tma13_fov1")
+so <- std_preprocess(so, nfeatures = 350)
+so <- run_pca(so, n_pcs = 20, pca.assay = "RNA")
+so <- umap_tsne(so, umap.flag = T, n_dims = 20)
+so <- cluster(so, n_dims = 20)
+```
+
+Here, we call the cell type assignments:
+
+```{r}
+# create r object 
+q <- c()
+q$tpm <- tpm 
+q$genes <- row.names(tpm)
+q$cells <- colnames(tpm)
+q$clusters <- paste0("C", so$RNA_snn_res.0.4)
+
+# read in your preferred cell type signatures
+cell.sig <- readRDS("/Volumes/ljerby/SharedResources/Data/Signatures/cell.type.sig.rds")
+cell.sig <- cell.sig$HGSC[-c(3,4,10)] # removing CD8.T, CD4.T, and cell cycle genes for now
+
+# execute to cell-type assignment code
+q <- scRNA_markers_assign(r = q,
+                     cell.clusters = q$clusters,
+                     cell.sig = cell.sig,
+                     non.immune.cell.types = c('Endothelial','CAF','Malignant'),
+                     immune.markers = c("CD3E","PTPRC","CD8A" ,"CD4"))
+```
+
+What do the cell-type assignments look like in in space? 
+
+```{r}
+plot_df <- data.frame(coor, 
+                      so@reductions$umap@cell.embeddings,
+                      cluster = q$clusters, 
+                      cell_type = q$cell.types)
+tibble(plot_df)
+```
+
+And now we use this data.frame to plot our cell-type assignments in space! 
+
+```{r}
+p <- ggplot(plot_df, aes(x = x, y = y, col = cell_type)) + 
+  geom_point(size = 0.5) +
+  scale_color_manual(values = c("#FF5B18", "#6580f0", "#c4a360", "#bc31cc", 
+                                "#3ec25f", "#fce728", "#b5b5b5")) +
+  theme(plot.title = element_text(hjust = 0.5, size = 16, face = "bold"), 
+        panel.background = element_rect(fill = "black",
+                                        colour = "black",
+                                        size = 0.5, linetype = "solid"),
+        panel.grid.major = element_line(size = 0.25, linetype = 'dotted'), 
+        panel.grid.minor = element_line(size = 0.1, linetype = 'dotted')) + 
+  coord_fixed()
+print(p)
+```
+
+Isn't the comparison to the composite image uncanny? 
+
+```{r}
+display(comp, method = "raster")
+```
+
+
+
