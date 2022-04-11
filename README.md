@@ -17,6 +17,7 @@ install_github("christineyyeh/opipes")
 
 ## Tutorials 
 [Markers-based Cell Type assignments for scRNA data](https://htmlpreview.github.io/?https://github.com/christineyyeh/opipes/blob/gh-pages/vignettes/cell_type_assignments.html)
+[Image Processing for Spatial single cell analysis]([Markers-based Cell Type assignments for scRNA data](https://htmlpreview.github.io/?https://github.com/christineyyeh/opipes/blob/gh-pages/vignettes/images.html)
 
 ## Questions? 
 Contact: Christine Yeh (cyyeh@stanford.edu)
