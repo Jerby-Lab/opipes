@@ -1,0 +1,9 @@
+# nextflow/20.01.0
+
+module load nextflow/20.01.0
+
+# unzip all the fastq.gz files for 210 RNA-Seq files
+sbatch --array 1-210 /labs/ccurtis2/cyyeh/tonic/workflows/process_rna/unzip.sh
+
+# [nextflow] run the 210 rna-seq single end rna!! 
+nextflow run nf-core/rnaseq -profile singularity --reads '/labs/ccurtis2/cyyeh/tonic/data/RNA-Seq/Baseline/*.fastq' --genome hg38 -c rnaseq.config --outdir rna-out --email cyyeh@stanford.edu -resume --singleEnd --skipBiotypeQC -w rna-workdir 
