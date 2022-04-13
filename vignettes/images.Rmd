@@ -300,6 +300,7 @@ for (celltype in celltypes_of_interest) {
                               }}))
   cell_q <- r$comp.reads[cell_meta$cellid]
   
+  cat(paste0("\tComputing PCA for ", celltype, " Data...\n"))
   sub <- seuratify(cell_tpm)
   sub <- std_preprocess(sub, nfeatures = 350)
   sub <- run_pca(sub, n_pcs = 20, pca.assay = "RNA", verbose = F)
@@ -316,7 +317,7 @@ for (celltype in celltypes_of_interest) {
 }
 ```
 
-Now we can call the MCP version of DIALOGUE 
+Now we can run DIALOGUE!
 
 ```{r eval=FALSE, warning=FALSE, include=TRUE}
 library(DIALOGUE)
