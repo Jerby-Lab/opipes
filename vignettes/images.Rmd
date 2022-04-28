@@ -229,6 +229,7 @@ q <- scRNA_markers_assign(q,
                      cell.sig = cell.sig,
                      non.immune.cell.types = c('Endothelial','CAF','Malignant'),
                      immune.markers = c("CD3E","PTPRC","CD8A","CD4"))
+install.packages("assertthat")
 ```
 
 
