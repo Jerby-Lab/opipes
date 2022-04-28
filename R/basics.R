@@ -113,6 +113,7 @@ get.p.zscores<-function(p){
 #' @param HG.universe genes for computing GO enrichment
 #' @param prf some sort of string parsing
 #' @return _z_-scores
+#' @export
 #'
 intersect.list1<-function(l,
                           g,
