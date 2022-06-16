@@ -217,21 +217,25 @@ scRNA_cluster.annotation.ttest <- function(r,
   z$cell.type<-z$cell.type1
   z$cell.type[!z$unique]<-"UD"
   r$cell.types<-z[r$clusters,"cell.type"]
-  b.mal<-r$cell.types=="Malignant"
-  b<-b&!b.mal
-  z.mal<-plyr::laply(unique(r$clusters),function(x) t.test.mat(t(r$markers.scores[b,]),r$clusters[b]==x)[,3])
-  # if(!is.null(r$cc)){
-  #   z.cc<-laply(unique(r$clusters),function(x){
-  #     p<-t.test.labels(r$cc,r$clusters==x,alternative = "greater")
-  #     p<-max(p,1e-30)
-  #     z<-ifelse(p<0.5,-log10(p),log10(1-p))
-  #     return(z)
-  #   })
-  # }
-  z$Malignant2<-z.mal[,"Malignant"]
-  # z$cycling<-z.cc
-  z$cell.type[z$cell.type=="UD"&z$n==0&z$Malignant2>minZ]<-"Malignant"
-  # z$cell.type[z$cell.type=="UD"&z$n==0&z$cycling>minZ]<-"Cycling"
+  
+  if ("Malignant" %in% unique(r$cell.types)) {
+    b.mal<-r$cell.types=="Malignant"
+    b<-b&!b.mal
+    z.mal<-plyr::laply(unique(r$clusters),function(x) t.test.mat(t(r$markers.scores[b,]),r$clusters[b]==x)[,3])
+    # if(!is.null(r$cc)){
+    #   z.cc<-laply(unique(r$clusters),function(x){
+    #     p<-t.test.labels(r$cc,r$clusters==x,alternative = "greater")
+    #     p<-max(p,1e-30)
+    #     z<-ifelse(p<0.5,-log10(p),log10(1-p))
+    #     return(z)
+    #   })
+    # }
+    z$Malignant2<-z.mal[,"Malignant"]
+    # z$cycling<-z.cc
+    z$cell.type[z$cell.type=="UD"&z$n==0&z$Malignant2>minZ]<-"Malignant"
+    # z$cell.type[z$cell.type=="UD"&z$n==0&z$cycling>minZ]<-"Cycling" 
+  }
+  
   r$cell.types<-z[r$clusters,"cell.type"]
   r$assignments.ttests<-z
   return(r)
@@ -300,4 +304,133 @@ get.mat<-function(m.rows,m.cols,data = NA){
   m<-matrix(data = data, nrow = length(m.rows),ncol = length(m.cols),
             dimnames = list(m.rows,m.cols))
   return(m)
+}
+
+#' scRNA Marker Based Cell Type Assignments
+#'
+#' Using gene expression markers, unsupervised clusters,
+#' and gene expression, assign the likely celltype to those
+#' clusters
+#'
+#' @param r data list including the gene expression data
+#' @param cell.clusters a _n_-length list to where _n_ is the number of cells
+#' @param cell.sig cell type signatures (list of lists of markers associated with each cell-type, default exists)
+#' @param EM.flag run EM? (default = F)
+#' @param OE.type which version of overall-expression to calculate (default = "V1")
+#' @param test.type which kind of test to test marker significance between clusters (default = "ttest")
+#' @param minZ minimum significance cutoff to assign a cell-type (default = 10)
+#' @return list object with cell type assignments
+#' @export
+scRNA_markers_subtype_assign <- function(r,
+                                 cell.clusters,
+                                 cell.sig,
+                                 EM.flag = F,
+                                 OE.type = "V1",
+                                 test.type = "ttest",
+                                 minZ = 10){
+  
+  # -------------------------------------
+  # reconcile cell-type signature markers
+  # -------------------------------------
+  if(missing(cell.sig)){
+    cell.sig<-list(T.cell = c("CD2","CD3D","CD3E","CD3G","CD4","CD8A","CD8B"),
+                   B.cell = c("CD19","CD79A","CD79B","BLK","CD20","CD22"),
+                   Macrophage = c("CD163","CD14","CSF1R","CD4"),
+                   Mast = c("ENPP3","KIT"),
+                   NK = c("KLRA1","NKG2","KLRB1","KLRD1"),
+                   Endothelial =  c("PECAM1", "VWF", "CDH5"),
+                   CAF = c("FAP","THY1","DCN", "COL1A1","COL1A2","COL6A1","COL6A2","COL6A3"),
+                   Malignant = c("EPCAM","MUC16","CD24"))
+  }
+  cell.sig<-intersect.list1(cell.sig,r$genes,n1 = 1)
+  
+  # --------------------------------------
+  # double check clusters are in the input
+  # --------------------------------------
+  
+  if(missing(cell.clusters)){
+    err.msg<-"Error: Cluster information is missing."
+    print(err.msg)
+    return(r)
+  }
+
+  # ----------------------------
+  # calculate overall expression
+  # ----------------------------
+  if(is.null(r$binZ)){r<-prep4OE(r)}
+  
+  if(OE.type == "V1"){
+    markers.scores<-get.OE(r, cell.sig)
+    r$markers.scores<-markers.scores[,names(cell.sig)]
+  }else{
+    r$zscores1<-t(apply(r$tpm,1,function(x) x/max(x)))
+    r$markers.scores<-t(laply(cell.sig,function(x) colMeans(r$zscores1[intersect(x,r$genes),])))
+    colnames(r$markers.scores)<-names(cell.sig)
+    r$markers.scores<-10*center.matrix(r$markers.scores)
+  }
+  
+  # --------------------------------------------
+  # statistical tests for determining cell-type
+  # --------------------------------------------
+  if(test.type == "ttest"){
+    # Use t-test to identify if the cells in a particular cluster
+    # have a higher expression of a specific cell type signature
+    # compared to all the other clusters together
+    r<-scRNA_cluster.annotation.ttest(r,cell.clusters = cell.clusters,minZ = minZ)
+  }else{
+    # Use enrichment of a specific cell type annotation in a cluster to annotate clusters.
+    r<-scRNA_cluster.annotation.HG(r,cell.clusters = cell.clusters,EM.flag = EM.flag)
+  }
+  
+  # ----------------------------------------------
+  # Set empty genes to "UD"
+  # ----------------------------------------------
+
+  r$cell.types[r$cell.types==""]<-"UD"
+  
+  # -------------------------
+  # print table of cell-types
+  # -------------------------
+  print(table(r$cell.types))
+  
+  return(r)
+}
+
+#' Hypergeometric Test
+#'
+#' function for computing hypergeometric test
+#' on single cell clustered data
+#'
+#' @param r data list including the gene expression data
+#' @param cell.clusters a _n_-length list of cluster assignments, where _n_ = number of cells
+#' @param EM.flag whether to compute EM
+#' @return data list, but now including a `cell.types` slot
+#'
+scRNA_cluster.annotation.HG <- function(r,
+                                        cell.clusters,
+                                        EM.flag){
+  
+  B.clusters<-labels.mat.2.logical.mat(cell.clusters)
+  # b<-rowSums(r$markersB[,names(cell.sig)])==1
+  # P<-get.hyper.p.value.mat(B.clusters[b,],r$markersB[b,],full.flag = T)
+  P<-get.hyper.p.value.mat(B.clusters,r$markersB,full.flag = T)
+  P$p[is.na(P$p)]<-1
+  View(t(P$frc))
+  cluster.cell.types<-laply(rownames(P$p),function(x){
+    p<-P$p[x,];sort(p)
+    ob<-P$ob[x,]
+    frc<-P$frc[x,]
+    b1<-p==min(p)&p<1e-3&frc>ifelse(EM.flag,0.6,0.08)
+    if(!any(b1)|sum(P$frc[x,names(cell.sig)]>0.4)>1){return("UD")}
+    b2<-ob==max(ob[b1])
+    v1<-names(ob)[b1&b2]
+    v<-v1
+    # v2<-colnames(r$markersB)[colMeans(r$markersB[B.clusters[,x],])>0.3]
+    # v<-paste(intersect(v1,v2),collapse = "_")
+    return(v)
+  })
+  names(cluster.cell.types)<-rownames(P$p)
+  r$cell.types<-cluster.cell.types[cell.clusters]
+  barplot(sort(table(cell.types)/length(cell.types),decreasing = T),las=2,main = "HG-based")
+  return(r)
 }
