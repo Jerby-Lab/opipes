@@ -4,10 +4,10 @@
 #SBATCH -o /labs/ccurtis2/cyyeh/tonic/workflows/process_rna/slurm/slurm-"%j".out
 
 # Account 
-#SBATCH --account=ccurtis2
+#SBATCH --account=ljerby
 
 # Send emails
-#SBATCH --mail-user=cyyeh@stanford.edu
+#SBATCH --mail-user=XX@stanford.edu <- FILL IN YOUR EMAIL
 #SBATCH --mail-type=FAIL
 
 # GLOBALS 

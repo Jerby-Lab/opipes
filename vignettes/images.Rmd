@@ -1,0 +1,332 @@
+---
+title: "Working with Image Data"
+author: "Christine Yiwen Yeh"
+date: "4/8/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Set-up: Loading/Installing Packages
+
+First, let's get some practice installing and loading packages: 
+
+```{r inst_pkgs, eval=FALSE, warning=FALSE, include=TRUE}
+# from CRAN 
+install.packages(c("ggplot2", "tibble", "devtools"))
+
+# from Bioconductor 
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install(version = "3.14")
+BiocManager::install("EBImage")
+
+# from Github 
+devtools::install_github("https://github.com/livnatje/DIALOGUE")
+devtools::install_github("https://github.com/Jerby-Lab/opipes")
+```
+
+To load packages, call `library(YOURPACKAGENAME)`
+
+```{r ld_pkgs, echo=TRUE, message=FALSE, warning=FALSE}
+# from CRAN
+library(ggplot2) 
+library(tibble) 
+library(pbapply)
+
+# from Bioconductor
+library(EBImage)
+
+# from Github 
+library(opipes) 
+library(DIALOGUE)
+```
+
+## Let's work with some real data: 
+
+For the purposes of this tutorial, we will load one sample from the ovarian 
+cancer project: TMA-13, FOV-1 
+
+```{r composite}
+PATH <- "/Volumes/ljerby/HGSC_Profiling/Data/SMI/5 Raw data/SMI-0028_TMA_13/CellComposite/CellComposite_F001.jpg"
+comp <- readImage(PATH)
+display(comp, method = "raster")
+```
+
+_Wait, what did you just do?_
+
+We just ran two functions from `EBImage`. A neat trick for helping you fetch the
+documentation on any function, is by putting a `?` in front of the function name
+
+```{r q_image_1,  eval=FALSE, warning=FALSE, include=TRUE}
+?readImage 
+```
+
+_What's in an `Image` object in R?_
+
+```{r q_image_2}
+comp
+```
+
+## Reading in IF layers for processing
+
+One of the things I'm working on whilst pre-processing the data, is to extract a 
+quantitative measure of the IF intensity. These images are LARGE. Even loading 
+them will take a bit. 
+
+From the documentation we obtained from `Nanostring`, we know that each of the 
+frames in the raw images corresponds to a particular immunofluorescent stain. 
+
+```{r if_image_load}
+PATH <- "/Volumes/ljerby/HGSC_Profiling/Data/SMI/5 Raw data/SMI-0028_TMA_13/RawMorphologyImages/20220222_094630_S2_C902_P99_N99_F001_Z005.TIF"
+img <- readImage(PATH)
+display(img, all = T)
+```
+
+## Exploring some outputs of Cell-Segmentation
+
+In order to extract IF intensities, you want to be able to assign each pixel to
+a cell. Lucky for me, Livnat has run cell-segmentation on our data. The `DAPI` 
+(frame 5) and `Membrane (CD298/B2M)` was used to do the cell-segmentation.
+
+```{r cell_seg_1}
+# Reading and cleaning matrix names 
+cellseg <- read.csv("/Volumes/ljerby/HGSC_Profiling/Results/Segmentation/SMI/Seg/SMI_T13_F001_whole-cell.csv")
+colnames(cellseg) <- unlist(lapply(colnames(cellseg), function(x) {strsplit(x , split = "X0.")[[1]][2]}))
+colnames(cellseg)[1] <- "0"
+cellseg_raw <- cellseg
+cellseg_raw[1000:1020, 1000:1009] 
+```
+
+Plotting the cell segmentation map
+
+```{r cell_seg_2}
+# Plot the cell segmentation map
+cellseg[cellseg == 1001] <- 0.9 # if a pixel is part of the cell, set the image intensity to 0.9
+display(1- Image(t(as.matrix(cellseg))),  method = "raster")
+```
+
+Reading and plotting the nuclear-segmentation only map: 
+```{r cell_seg_3}
+# Reading and cleaning matrix names 
+nuclearseg <- read.csv("/Volumes/ljerby/HGSC_Profiling/Results/Segmentation/SMI/Seg/SMI_T13_F001_nuclear.csv")
+colnames(nuclearseg) <- unlist(lapply(colnames(nuclearseg), function(x) {strsplit(x , split = "X0.")[[1]][2]}))
+colnames(nuclearseg)[1] <- "0"
+nuclearseg_raw <- nuclearseg
+
+# Plot the nuclear cell segmentation map
+nuclearseg[nuclearseg != 0] <- 0.9
+display(1- Image(t(as.matrix(nuclearseg))),  method = "raster")
+```
+
+## Match cell segmentation with IF intensities 
+
+`PanCK`, `CD45` and `CD3` immuno-flurescent intensity would be useful for 
+cross-checking with computationally derived cell-type assignments downstream, 
+so we will extract that now! 
+
+```{r if_table}
+frameID <- data.frame(stain = c("Membrane", "PanCK", "CD45", "CD3", "DAPI"),
+           frame_id = c(1:5))
+tibble(frameID)
+```
+
+In the code block below, we loop over the 3 frames that contain 
+`PanCK`, `CD45` and `CD3` intensity, and every cell, to extract the IF intensity 
+of the cytoplasm. It is very slow (hours for one FOV), so we will not run it. 
+Instead, I am running this in parallel on the cluster (topic for another time). 
+
+```{r if_code, eval=FALSE, include=TRUE}
+if_list <- lapply(2:4, function(fid){
+  print(fid)
+  intensities <- data.frame(t(pbsapply(c(1:max(cellseg_raw)), simplify = T, function(cid){
+    if (sum(t(cellseg_raw) == cid & t(nuclearseg) == 0) == 0) { # this is the case where the cell segmentation is pretty much just the nucleus...
+      return(c(NA, NA))
+    } else { 
+      mean <- mean(img@.Data[,,fid][t(cellseg_raw) == cid & t(nuclearseg) == 0])
+      max <- max(img@.Data[,,fid][t(cellseg_raw) == cid & t(nuclearseg) == 0])
+      return(c(max, mean)) 
+    }
+  })))
+  colnames(intensities) <- paste0(frameID[fid,]$stain, c("_max", "_mean")) 
+  return(intensities)
+})
+if_frame <- do.call("cbind", if_list)
+row.names(if_frame) <- c(1:max(cellseg_raw))
+saveRDS(if_frame, file = "/Volumes/ljerby/HGSC_Profiling/Intermediate/20220410_TMA13_FOV1_intensities.rds")
+```
+
+## Computational cell-type assignments
+
+There are some cell-types we obviously didn't stain for (e.g endothelial marker, 
+fibroblast marker etc). We will use the RNA quantifications for each cell to 
+assign cell-types. 
+
+First, we load the RNA data: 
+
+```{r rna}
+tma13 <- readRDS("/Volumes/ljerby/HGSC_Profiling/Data/R_data/SMI_HGSC_TMA13_mesmer.rds")
+r <- tma13$SMI_T13_F001
+remove(tma13)
+names(r)
+```
+
+First, we process the data by filtering out cells with too few overall counts
+
+```{r rna_filt}
+tpm <- r$tpm[,unlist(apply(r$cd, 2, sum)) > 50]
+coor <- r$coor[unlist(apply(r$cd, 2, sum)) > 50,]
+```
+
+Now we use the wrappers in `opipes` to cluster the data. By "wrappers" I mean I 
+wrote code that "wraps" around other code. In this case, the other code is 
+`Seurat`
+
+```{r cluster}
+set.seed(123)
+so <- seuratify(tpm, prj = "tma13_fov1")
+so <- std_preprocess(so, nfeatures = 350)
+so <- run_pca(so, n_pcs = 20, pca.assay = "RNA")
+so <- umap_tsne(so, umap.flag = T, n_dims = 20)
+so <- opipes::cluster(so, n_dims = 20)
+```
+
+Let's plot our clustering:
+
+```{r plot_clust}
+plot_df <- data.frame(so@reductions$umap@cell.embeddings,
+                      cluster = so$RNA_snn_res.0.4)
+p <- ggplot(plot_df, aes(x = UMAP_1, y = UMAP_2, col = cluster)) + 
+  geom_point(size = 0.5) +
+  theme_bw() + 
+  coord_fixed() + 
+  guides(colour = guide_legend("cluster", 
+                               override.aes = list(size=3, shape = 15)))
+print(p)
+```
+
+
+Here, we call the cell type assignments, using a cell-type assignment 
+code that I've wrapped into `opipes`
+
+```{r cell_types}
+# create a list object 
+q <- c()
+q$tpm <- tpm 
+q$genes <- row.names(tpm)
+q$cells <- colnames(tpm)
+q$clusters <- paste0("C", so$RNA_snn_res.0.4)
+
+# read in your preferred cell type signatures
+cell.sig <- readRDS("/Volumes/ljerby/SharedResources/Data/Signatures/cell.type.sig.rds")
+cell.sig <- cell.sig$HGSC[-c(3,4,10)] # removing CD8.T, CD4.T, and cell cycle genes for now
+
+# execute to cell-type assignment code
+q <- scRNA_markers_assign(q,
+                     cell.clusters = q$clusters,
+                     cell.sig = cell.sig,
+                     non.immune.cell.types = c('Endothelial','CAF','Malignant'),
+                     immune.markers = c("CD3E","PTPRC","CD8A","CD4"))
+install.packages("assertthat")
+```
+
+
+What do the cell-type assignments look like in in space? 
+
+```{r plot_df}
+plot_df <- data.frame(coor, 
+                      so@reductions$umap@cell.embeddings,
+                      cluster = q$clusters, 
+                      cell_type = q$cell.types, 
+                      so@reductions$pca@cell.embeddings)
+tibble(plot_df)
+```
+
+And now we use this data.frame to plot our cell-type assignments in physical space 
+
+```{r plot}
+p <- ggplot(plot_df, aes(x = x, y = y, col = cell_type)) + 
+  geom_point(size = 0.5) +
+  scale_color_manual(values = c("#FF5B18", "#6580f0", "#c4a360", "#bc31cc", 
+                                "#3ec25f", "#fce728", "#b5b5b5")) +
+  theme(plot.title = element_text(hjust = 0.5, size = 16, face = "bold"), 
+        panel.background = element_rect(fill = "black",
+                                        colour = "black",
+                                        size = 0.5, linetype = "solid"),
+        panel.grid.major = element_line(size = 0.25, linetype = 'dotted'), 
+        panel.grid.minor = element_line(size = 0.1, linetype = 'dotted')) +
+    guides(colour = guide_legend("cluster", 
+                               override.aes = list(size=3, shape = 15))) +
+  coord_fixed()
+print(p)
+```
+
+Isn't the comparison to the composite image uncanny? 
+
+```{r display_comp}
+display(comp, method = "raster")
+```
+
+## Running DIALOGUE for Discovering Multicellular Programs
+
+We will now run a tool developed by Livnat, for identifying 
+"multi-cellular programs". Let's do an analysis to see 
+if there are multi-cullular programs between malignant, 
+fibroblasts, and macrophages
+
+The first step is to make a DIALOGUE "cell type" object
+for each cell type of interest and store it in a list. 
+
+```{r warning=FALSE}
+celltypes_of_interest <-c("Malignant", "Macrophage", "CAF")
+cell.types <- c()
+for (celltype in celltypes_of_interest) {
+  cat(paste0("\nProcessing ", celltype, "...\n"))
+  idx <- which(plot_df$cell_type == celltype)
+  
+  cat(paste0("\tSubsetting ", celltype, " Data...\n"))
+  cell_tpm <- q$tpm[,idx]
+  cell_meta <- so@meta.data[idx,]
+  samples <- unlist(apply(coor[idx,], 1, function(row){
+                             if(row[1] < 2000  & row [2] <2000) {
+                               return("niche1") 
+                              } else if (row[1] >= 2000 & row[2] < 2000) {
+                                return("niche2")
+                              } else  if (row[1] >= 2000 & row[2] >= 2000) {
+                                return("niche3") 
+                              } else {
+                                return("niche4")
+                              }}))
+  cell_q <- r$comp.reads[cell_meta$cellid]
+  
+  cat(paste0("\tComputing PCA for ", celltype, " Data...\n"))
+  sub <- seuratify(cell_tpm)
+  sub <- std_preprocess(sub, nfeatures = 350)
+  sub <- run_pca(sub, n_pcs = 20, pca.assay = "RNA", verbose = F)
+  
+  cat(paste0("\tCompute cell type object for ", celltype,  "...\n"))
+  cell.types[[celltype]] <- DIALOGUE::make.cell.type(
+    name = celltype, # the cell types
+    tpm = cell_tpm, # tpm 
+    samples = samples, #sample 
+    X = sub@reductions$pca@cell.embeddings, # pcs 
+    metadata = cell_meta, #metadata 
+    cellQ = cell_q # cell quality
+  )
+}
+```
+
+Now we can run DIALOGUE!
+
+```{r eval=FALSE, warning=FALSE, include=TRUE}
+library(DIALOGUE)
+R<-DIALOGUE.run(rA =cell.types, 
+                main = "20220412_Tutorial",
+                k = 3, 
+                results.dir = "~/Desktop/tutorial", 
+                n.genes = 20)
+                # conf = "cellQ",covar = c("cellQ"))
+```
+
