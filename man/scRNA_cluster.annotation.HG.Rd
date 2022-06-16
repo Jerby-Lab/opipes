@@ -5,6 +5,8 @@
 \title{Hypergeometric Test}
 \usage{
 scRNA_cluster.annotation.HG(r, cell.clusters, EM.flag)
+
+scRNA_cluster.annotation.HG(r, cell.clusters, EM.flag)
 }
 \arguments{
 \item{r}{data list including the gene expression data}
@@ -15,8 +17,13 @@ scRNA_cluster.annotation.HG(r, cell.clusters, EM.flag)
 }
 \value{
 data list, but now including a \code{cell.types} slot
+
+data list, but now including a \code{cell.types} slot
 }
 \description{
+function for computing hypergeometric test
+on single cell clustered data
+
 function for computing hypergeometric test
 on single cell clustered data
 }
