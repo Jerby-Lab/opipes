@@ -24,7 +24,8 @@ scRNA_markers_assign <- function(r,
                                  EM.flag = F,
                                  OE.type = "V1",
                                  test.type = "ttest",
-                                 minZ = 10){
+                                 minZ = 10,
+                                 subsample = T){
 
   # -------------------------------------
   # reconcile cell-type signature markers
@@ -205,8 +206,14 @@ scRNA_cluster.annotation.HG <- function(r,
 #'
 scRNA_cluster.annotation.ttest <- function(r,
                                          cell.clusters,
-                                         minZ = 10) {
-  b<-sample.per.label(r$clusters,500) # boolean for subsampling
+                                         minZ = 10,
+                                         subsample = F) {
+  if (subsample) {
+    b<-sample.per.label(r$clusters,500) # boolean for subsampling
+  }
+
+  b <- rep(TRUE, length(r$clusters))
+
   z<-plyr::laply(unique(r$clusters),function(x) t.test.mat(t(r$markers.scores[b,]),r$clusters[b]==x)[,3])
   rownames(z)<-unique(r$clusters)
   z<-cbind.data.frame(z,cell.type1 = colnames(z)[apply(z,1,function(x) which(x==max(x))[1])],
@@ -217,7 +224,7 @@ scRNA_cluster.annotation.ttest <- function(r,
   z$cell.type<-z$cell.type1
   z$cell.type[!z$unique]<-"UD"
   r$cell.types<-z[r$clusters,"cell.type"]
-  
+
   if ("Malignant" %in% unique(r$cell.types)) {
     b.mal<-r$cell.types=="Malignant"
     b<-b&!b.mal
@@ -233,9 +240,9 @@ scRNA_cluster.annotation.ttest <- function(r,
     z$Malignant2<-z.mal[,"Malignant"]
     # z$cycling<-z.cc
     z$cell.type[z$cell.type=="UD"&z$n==0&z$Malignant2>minZ]<-"Malignant"
-    # z$cell.type[z$cell.type=="UD"&z$n==0&z$cycling>minZ]<-"Cycling" 
+    # z$cell.type[z$cell.type=="UD"&z$n==0&z$cycling>minZ]<-"Cycling"
   }
-  
+
   r$cell.types<-z[r$clusters,"cell.type"]
   r$assignments.ttests<-z
   return(r)
@@ -327,8 +334,9 @@ scRNA_markers_subtype_assign <- function(r,
                                  EM.flag = F,
                                  OE.type = "V1",
                                  test.type = "ttest",
-                                 minZ = 10){
-  
+                                 minZ = 10,
+                                 subsample =F){
+
   # -------------------------------------
   # reconcile cell-type signature markers
   # -------------------------------------
@@ -343,11 +351,11 @@ scRNA_markers_subtype_assign <- function(r,
                    Malignant = c("EPCAM","MUC16","CD24"))
   }
   cell.sig<-intersect.list1(cell.sig,r$genes,n1 = 1)
-  
+
   # --------------------------------------
   # double check clusters are in the input
   # --------------------------------------
-  
+
   if(missing(cell.clusters)){
     err.msg<-"Error: Cluster information is missing."
     print(err.msg)
@@ -358,7 +366,7 @@ scRNA_markers_subtype_assign <- function(r,
   # calculate overall expression
   # ----------------------------
   if(is.null(r$binZ)){r<-prep4OE(r)}
-  
+
   if(OE.type == "V1"){
     markers.scores<-get.OE(r, cell.sig)
     r$markers.scores<-markers.scores[,names(cell.sig)]
@@ -368,7 +376,7 @@ scRNA_markers_subtype_assign <- function(r,
     colnames(r$markers.scores)<-names(cell.sig)
     r$markers.scores<-10*center.matrix(r$markers.scores)
   }
-  
+
   # --------------------------------------------
   # statistical tests for determining cell-type
   # --------------------------------------------
@@ -376,23 +384,23 @@ scRNA_markers_subtype_assign <- function(r,
     # Use t-test to identify if the cells in a particular cluster
     # have a higher expression of a specific cell type signature
     # compared to all the other clusters together
-    r<-scRNA_cluster.annotation.ttest(r,cell.clusters = cell.clusters,minZ = minZ)
+    r<-scRNA_cluster.annotation.ttest(r,cell.clusters = cell.clusters,minZ = minZ, subsample = subsample)
   }else{
     # Use enrichment of a specific cell type annotation in a cluster to annotate clusters.
     r<-scRNA_cluster.annotation.HG(r,cell.clusters = cell.clusters,EM.flag = EM.flag)
   }
-  
+
   # ----------------------------------------------
   # Set empty genes to "UD"
   # ----------------------------------------------
 
   r$cell.types[r$cell.types==""]<-"UD"
-  
+
   # -------------------------
   # print table of cell-types
   # -------------------------
   print(table(r$cell.types))
-  
+
   return(r)
 }
 
@@ -409,7 +417,7 @@ scRNA_markers_subtype_assign <- function(r,
 scRNA_cluster.annotation.HG <- function(r,
                                         cell.clusters,
                                         EM.flag){
-  
+
   B.clusters<-labels.mat.2.logical.mat(cell.clusters)
   # b<-rowSums(r$markersB[,names(cell.sig)])==1
   # P<-get.hyper.p.value.mat(B.clusters[b,],r$markersB[b,],full.flag = T)
