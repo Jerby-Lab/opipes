@@ -13,7 +13,8 @@ scRNA_markers_assign(
   EM.flag = F,
   OE.type = "V1",
   test.type = "ttest",
-  minZ = 10
+  minZ = 10,
+  subsample = T
 )
 }
 \arguments{

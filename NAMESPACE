@@ -2,6 +2,7 @@
 
 export(cluster)
 export(embed)
+export(intersect.list1)
 export(recon_loss)
 export(run_pca)
 export(scRNA_markers_assign)
