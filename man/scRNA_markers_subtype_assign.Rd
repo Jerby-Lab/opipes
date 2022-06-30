@@ -11,7 +11,8 @@ scRNA_markers_subtype_assign(
   EM.flag = F,
   OE.type = "V1",
   test.type = "ttest",
-  minZ = 10
+  minZ = 10,
+  subsample = F
 )
 }
 \arguments{

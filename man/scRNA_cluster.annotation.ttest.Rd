@@ -4,7 +4,7 @@
 \alias{scRNA_cluster.annotation.ttest}
 \title{Compute \emph{t}-tests}
 \usage{
-scRNA_cluster.annotation.ttest(r, cell.clusters, minZ = 10)
+scRNA_cluster.annotation.ttest(r, cell.clusters, minZ = 10, subsample = F)
 }
 \arguments{
 \item{r}{data list including the gene expression data}
