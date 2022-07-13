@@ -10,7 +10,6 @@
 #' @param replace boolean to sample with (T) or without (F) replacement
 #' @return a list with objects named "c" and "m" corresponding to your subsampled counts and metadata
 #' @export
-
 subsample <- function(counts,
                       metadata,
                       p=0.5,
@@ -258,43 +257,124 @@ discretize.prvt<-function(v,
   return(u)
 }
 
-#' Compute _t_-tests
+#' Apply Hierarchical Linear Model with specific formula
 #'
-#' computes _t_-tests for a matrix
+#' Wrapper to compute differentially expressed genes with
+#' a hierarchical linear model
 #'
-#' @param m markers matrix (subsampled, in some cases)
-#' @param b boolean for the right cluster
-#' @param two.sided boolean to determine whether you want to run a two-sided t-test
-#' @param rankf (default = F)
-#' @param fold.changeF (default = F)
-#' @return p-value table
+#' @param r list object of sequencing data
+#' @param X fixed effects
+#' @param Y outcome
+#' @param formula formula for the hierarchical model
+#' @param ttest.flag (default = F) is flag for computing ttest?
+#' @return pvalues of hlm
 #'
-t.test.mat<-function(m,b,two.sided=F,rankf = F,fold.changeF = F){
-  if(length(b)!=ncol(m)){
-    print("Error. Inconsistent no. of samples.")
-    return()
-  }
-  if(sum(b)<2||sum(!b)<2){
-    return(get.mat(rownames(m),c('more','less',"zscores")))
-  }
-  if(two.sided){
-    p<-as.matrix(apply(m,1,function(x) t.test(x[b],x[!b])$p.value))
+apply.formula.HLM<-function(r,X,Y,MARGIN = 1,formula = "y ~ (1 | samples) + x",ttest.flag = F){
+  if(is.matrix(Y)){
+    if(ttest.flag){
+      m1<-t.test.mat(Y,X)
+      b<-rowSums(p.adjust.mat(m1[,1:2])<0.1,na.rm = T)>0
+      m1<-m1[b,];Y<-Y[b,]
+    }
+    m<-t(apply(Y,MARGIN = MARGIN,function(y){formula.HLM(y,X,r,formula = formula)}))
   }else{
-    p<-t(apply(m,1,function(x) c(t.test(x[b],x[!b],alternative = 'greater')$p.value,
-                                 t.test(x[b],x[!b],alternative = 'less')$p.value)))
-    colnames(p)<-c('more','less')
-    p<-cbind(p,get.p.zscores(p))
-    colnames(p)[3]<-"zscores"
+    m<-t(apply(X,MARGIN = MARGIN,function(x){formula.HLM(Y,x,r,formula = formula)}))
   }
-  if(rankf){
-    p<-cbind(p,rank(p[,1]),rank(p[,2]))
-    colnames(p)[4:5]<-c("rank.more","rank.less")
+  colnames(m)<-c("Estimate","P")
+  m<-cbind.data.frame(Z = get.cor.zscores(m[,"Estimate"],m[,"P"]),m)
+  if(ttest.flag){
+    m<-cbind.data.frame(m,ttest = m1)
   }
-  if(fold.changeF){
-    p<-cbind.data.frame(p,pos.mean = rowMeans(m[,b]),neg.mean = rowMeans(m[,!b]))
-    p$logFC<-log2(p$pos.mean/p$neg.mean)
-  }
-
-  return(p)
+  return(m)
 }
 
+#' Execute lmer using formula
+#'
+#' Wrapper to compute with hierarchical
+#' linear model
+#'
+#' @param y list object of sequencing data
+#' @param x fixed effects
+#' @param r0 outcome
+#' @param formula formula for the hierarchical model
+#' @param ttest.flag (default = F) is flag for computing ttest?
+#' @return pvalues of hlm
+#' @export
+formula.HLM<-function(y,x,r0, formula = "y ~ (1 | samples) + x",val = ifelse(is.numeric(x),"","TRUE"),return.all = F){
+  r0$x<-x;r0$y<-y
+  f<-function(r0){
+    M1 <- with(r0, lmer (formula = formula))
+    if(return.all){
+      c1<-summary(M1)$coef[,c("Estimate","Pr(>|t|)")]
+    }else{
+      c1<-summary(M1)$coef[paste0("x",val),]
+      idx<-match(c("Estimate","Pr(>|t|)"),names(c1))
+      c1<-c1[idx]
+    }
+    return(c1)
+  }
+  c1<-tryCatch({f(r0)},
+               error = function(err){return(c(NA,NA))})
+  return(c1)
+}
+
+#' Subset a list object based on cell ids
+#'
+#' Use the cell ids to make a new list object
+#' with cells subsets.
+#'
+#' @param r original list object
+#' @param subcells ids of cells to subset
+#' @return a new subsetted list object
+#' @export
+subset_list <- function(r, subcells) {
+  n_cells <- length(r$cells)
+  n_genes <- length(r$genes)
+  q <- lapply(r, function(x){
+    if (is.null(dim(x))) {
+      # this item is a list
+      if(length(x) == n_cells) {
+        return (x[r$cells %in% subcells])
+      } else {
+        return(x)
+      }
+    } else if (dim(x)[2] == n_cells){
+      return(x[,r$cells %in% subcells])
+    } else if (dim(x)[1] == n_cells) {
+      return(x[r$cells %in% subcells,])
+    } else {
+      return (x)
+    }
+  })
+  return(q)
+}
+
+#' Transfer meta data from a list object to a
+#' Seurat object.
+#'
+#' User can specify which fields to transfer from
+#' a list object to a seurat object
+#'
+#' @param r original list object
+#' @param so seurat object
+#' @param transfer_list list of meta fields to transfer
+#' @return a new subsetted list object
+#' @export
+transfer_data_list_to_so <- function(r, so, transfer_list = c("coor",
+                                                              "samples",
+                                                              "TMAs",
+                                                              "patients",
+                                                              "samples",
+                                                              "sites",
+                                                              "treatment",
+                                                              "cell.types",
+                                                              "cell.types2")){
+  for (field in transfer_list) {
+    if (is.null(dim(r[[field]]))) {
+      so@meta.data[[field]] <- r[[field]]
+    } else {
+      so@meta.data <- cbind(so@meta.data, r[[field]])
+    }
+  }
+  return(so)
+}
