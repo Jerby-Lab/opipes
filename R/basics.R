@@ -161,7 +161,7 @@ prep4OE<-function(r,
 #' @param r data list
 #' @param sig (default = 50)
 #' @return r, your data list
-#'
+#' @export
 get.OE<-function(r,sig){
   scores<-get.OE1(r,sig)
   names(sig)<-gsub(" ",".",names(sig))

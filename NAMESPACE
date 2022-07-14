@@ -3,6 +3,7 @@
 S3method(formula,HLM)
 export(cluster)
 export(embed)
+export(get.OE)
 export(intersect.list1)
 export(recon_loss)
 export(run_pca)
