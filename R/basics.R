@@ -193,7 +193,11 @@ get.OE<-function(r,sig){
 #' @param r data list
 #' @param sig (default = 50)
 #' @return r, your data list
+<<<<<<< HEAD
 #' @export
+=======
+#'
+>>>>>>> 8f781af8a6374298c6baaf805667401e5c9a92fb
 get.OE1 <- function(r,sig){
   if(is.list(sig)){
     scores<-t(plyr::laply(sig, function(g) get.OE1(r,g)))
@@ -349,6 +353,7 @@ subset_list <- function(r, subcells) {
   return(q)
 }
 
+<<<<<<< HEAD
 
 #' Scale and Center
 #'
@@ -388,6 +393,8 @@ cap_object <- function(X, q){
 
 
 
+=======
+>>>>>>> 8f781af8a6374298c6baaf805667401e5c9a92fb
 #' Transfer meta data from a list object to a
 #' Seurat object.
 #'
@@ -417,6 +424,7 @@ transfer_data_list_to_so <- function(r, so, transfer_list = c("coor",
   }
   return(so)
 }
+<<<<<<< HEAD
 
 #' Compute Spearman Correlation on two list objects
 #'
@@ -525,3 +533,5 @@ get.top.elements<-function (m,q = 100,min.ci = NULL,main = ""){
   names(top.l)<-paste0(main,colnames(m))
   return(top.l)
 }
+=======
+>>>>>>> 8f781af8a6374298c6baaf805667401e5c9a92fb
