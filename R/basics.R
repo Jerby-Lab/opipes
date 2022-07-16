@@ -193,7 +193,7 @@ get.OE<-function(r,sig){
 #' @param r data list
 #' @param sig (default = 50)
 #' @return r, your data list
-#'
+#' @export
 get.OE1 <- function(r,sig){
   if(is.list(sig)){
     scores<-t(plyr::laply(sig, function(g) get.OE1(r,g)))
@@ -349,6 +349,45 @@ subset_list <- function(r, subcells) {
   return(q)
 }
 
+
+#' Scale and Center
+#'
+#' scale and center a matrix
+#'
+#' @param X a numeric matrix-like object
+#' @param MARGIN margin
+#' @return a scaled and centered matrix
+#' @export
+scale_and_center <- function(X, MARGIN){
+  X_norm = t(apply(X, MARGIN, function(x){
+    loc = mean(x, na.rm =T)
+    center = x - loc
+    scale = center/sd(x)
+    return(scale)
+  }))
+  return(X_norm)
+}
+
+
+#' Cap Data
+#'
+#' Cap the values of data (matrix, data.frame, or list)
+#'
+#' @param X a list-list object, matrix, dataframe, or list
+#' @param q quantile to cap at (e.g. 0.05 is capping at the bottom 5th and top 95th quantiles)
+#' @return a capped version of your input object.
+#' @export
+cap_object <- function(X, q){
+  ceil_q <- 1 - q
+  ceil <- quantile(X, ceil_q)
+  floor <- quantile(X, q)
+  X[X > ceil] <- ceil
+  X[X < floor] <- floor
+  return(X)
+}
+
+
+
 #' Transfer meta data from a list object to a
 #' Seurat object.
 #'
@@ -377,4 +416,112 @@ transfer_data_list_to_so <- function(r, so, transfer_list = c("coor",
     }
   }
   return(so)
+}
+
+#' Compute Spearman Correlation on two list objects
+#'
+#' Wrapper around correlation.
+#'
+#' @param v1 matrix, rows are samples, columns are genes
+#' @param v2 metric to evaluate the correlation with (must be same length as rows of v1)
+#' @param method (default = "spearman")
+#' @param use (default = "pairwise.complete.obs") type of correlation
+#' @param match.flag (default = F)
+#' @param alternative (default = "two.sided") alternative hypothesis for correlation test
+#' @param upper.tri.flag (default = F)
+#' @return a new subsetted list object
+#' @export
+spearman.cor<-function(v1,v2 = NULL,method = 'spearman',use = "pairwise.complete.obs",
+                       match.flag = F,alternative = "two.sided",upper.tri.flag = F){
+  if(is.null(v2)){
+    v2<-v1
+  }
+  if(!is.matrix(v1)){v1<-as.matrix(v1)}
+  if(!is.matrix(v2)){v2<-as.matrix(v2)}
+  if(match.flag){
+    n=ncol(v1)
+    if(is.null(colnames(v1))){colnames(v1)<-1:ncol(v1)}
+    results<-get.mat(m.cols = c("R","P"),m.rows = colnames(v1))
+    for(i in 1:ncol(v1)){
+      c.i <- cor.test(v1[,i],v2[,i],method = method,use = use, alternative = alternative)
+      results[i,1] <- c.i$estimate
+      results[i,2] <- c.i$p.value
+    }
+  }else{
+    n1=ncol(v1)
+    m<-matrix(nrow = n1,ncol = ncol(v2))
+    rownames(m)<-colnames(v1)
+    colnames(m)<-colnames(v2)
+    results<-list(cor = m, p = m)
+    for(i in 1:n1){
+      f<-function(x){
+        c.i<-cor.test(v1[,i],x,method = method,use = use, alternative = alternative);
+        c(c.i$estimate,c.i$p.value)}
+      c.i <- apply(v2,2,f)
+      results$cor[i,] <- c.i[1,]
+      results$p[i,] <- c.i[2,]
+    }
+    if(ncol(v2)==1){
+      results<-cbind(results$cor,results$p)
+      colnames(results)<-c('R','P')
+    }
+  }
+  if(upper.tri.flag){
+    results$up <- cbind(results$cor[upper.tri(results$cor)],
+                        results$p[upper.tri(results$p)])
+  }
+  return(results)
+}
+
+#' Fetch genes with top correlation
+#'
+#' Wrapper around a rank fetch
+#'
+#' @param m matrix
+#' @param q (default = 100)
+#' @param min.ci (default = 0)
+#' @param idx (default = NULL)
+#' @param add.prefix = (default = "") string to prepend to names
+#' @export
+get.top.cor<-function(m,q = 100,min.ci = 0,idx = NULL, add.prefix =""){
+  m<-as.matrix(m)
+  if(is.null(colnames(m))){colnames(m)<-1:ncol(m)}
+  m.pos<-(-m);m.neg<-m
+
+  colnames(m.pos)<-paste0(colnames(m.pos),".up")
+  colnames(m.neg)<-paste0(colnames(m.neg),".down")
+  v<-get.top.elements(cbind(m.pos,m.neg),q,min.ci = (-abs(min.ci)))
+  names(v)<-c(colnames(m.pos),colnames(m.neg))
+  if(!is.null(idx)){
+    v<-v[paste(idx,c("up","down"),sep = ".")]
+  }
+  names(v)<-paste0(add.prefix,names(v))
+  return(v)
+}
+
+#' Fetch top elements of a matrix
+#'
+#' Wrapper around a rank fetch
+#'
+#' @param m matrix
+#' @param q (default = 100)
+#' @param min.ci (default = 0)
+#' @param idx (default = NULL)
+#' @param add.prefix = (default = "") string to prepend to names
+#' @export
+get.top.elements<-function (m,q = 100,min.ci = NULL,main = ""){
+  top.l<-list()
+  v<-rownames(m)
+  for (i in 1:ncol(m)){
+    mi<-m[,i];mi<-mi[!is.na(mi)]
+    idx<-order(mi,decreasing = F)
+    ci <- mi[idx[min(q,length(mi))]]
+    ci <- min(ci,min.ci)
+    b <- m[,i]<=ci
+    b[is.na(m[,i])]<-F
+    top.l[[i]]<-sort(v[b])
+  }
+  if(main!=""){main<-paste0(main,".")}
+  names(top.l)<-paste0(main,colnames(m))
+  return(top.l)
 }
