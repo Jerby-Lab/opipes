@@ -193,11 +193,8 @@ get.OE<-function(r,sig){
 #' @param r data list
 #' @param sig (default = 50)
 #' @return r, your data list
-<<<<<<< HEAD
 #' @export
-=======
 #'
->>>>>>> 8f781af8a6374298c6baaf805667401e5c9a92fb
 get.OE1 <- function(r,sig){
   if(is.list(sig)){
     scores<-t(plyr::laply(sig, function(g) get.OE1(r,g)))
