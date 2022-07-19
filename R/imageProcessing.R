@@ -38,7 +38,7 @@ spatial_sample_visualization <- function(
   contvals = NULL) {
 
   # read in a process cellsegmentation mask
-  cellseg = ead.csv(seg_path)
+  cellseg = read.csv(seg_path)
   colnames(cellseg) <- unlist(lapply(colnames(cellseg), function(x) {strsplit(x , split = "X0.")[[1]][2]}))
   colnames(cellseg)[1] <- "0"
   cellmask <- cellseg
